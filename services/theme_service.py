@@ -85,26 +85,118 @@ class ThemeService:
         
         css_rules = f"""
         /* --- Cognitive Core Custom Backend Theme --- */
+        
+        /* 1. Main Navbar Header */
         .o_main_navbar {{
             background: linear-gradient(135deg, {navbar_bg_start} 0%, {navbar_bg_end} 100%) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08) !important;
         }}
+        
+        /* 2. Navbar Links, Menus & Text */
         .o_main_navbar .o_nav_entry,
         .o_main_navbar .o_menu_brand,
         .o_main_navbar .o_menu_sections .nav-link,
-        .o_main_navbar .o_menu_systray .o_nav_entry {{
+        .o_main_navbar .o_menu_systray .o_nav_entry,
+        .o_main_navbar .dropdown-toggle,
+        .o_main_navbar a {{
             color: {navbar_text_color} !important;
             font-weight: 500 !important;
         }}
-        .o_main_navbar .o_nav_entry:hover,
-        .o_main_navbar .o_menu_sections .nav-link:hover {{
-            background-color: rgba(255, 255, 255, 0.12) !important;
-            border-radius: 4px !important;
+
+        /* 3. Active Menu Pill / Tab (replaces purple active button) */
+        .o_main_navbar .o_menu_sections .active,
+        .o_main_navbar .o_menu_sections .nav-link.active,
+        .o_main_navbar .o_menu_sections .dropdown-toggle.active,
+        .o_main_navbar .o_nav_entry.active,
+        .o_main_navbar .dropdown-item.active {{
+            background-color: rgba(255, 255, 255, 0.25) !important;
+            color: #FFFFFF !important;
+            border-radius: 6px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
         }}
-        .btn-primary, .o_form_button_save {{
+        
+        .o_main_navbar .o_menu_sections .nav-link:hover,
+        .o_main_navbar .o_nav_entry:hover,
+        .o_main_navbar .dropdown-toggle:hover {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            border-radius: 6px !important;
+        }}
+
+        /* 4. User Avatar Icon (Top Right 'K' Circle) */
+        .o_main_navbar .o_user_avatar,
+        .o_main_navbar .o_avatar,
+        .o_main_navbar .o_user_menu .rounded-circle,
+        .o_main_navbar .o_user_menu span.rounded-circle,
+        .o_main_navbar span.bg-view-avatar,
+        .o_main_navbar div.rounded-circle {{
+            background: linear-gradient(135deg, {primary_accent} 0%, #0284C7 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            font-weight: bold !important;
+        }}
+
+        /* 5. Control Panel & Action Buttons ('Nuevo', 'Guardar', 'Confirmar') */
+        .o_control_panel .btn-primary,
+        .o_form_button_save,
+        .o_list_button_add,
+        .btn-primary {{
+            background-color: {primary_accent} !important;
+            border-color: #0284C7 !important;
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+            box-shadow: 0 1px 2px rgba(14, 165, 233, 0.3) !important;
+        }}
+        .o_control_panel .btn-primary:hover,
+        .btn-primary:hover {{
+            background-color: #0284C7 !important;
+            border-color: #0369A1 !important;
+        }}
+
+        .o_control_panel .btn-outline-primary,
+        .btn-outline-primary,
+        .o_control_panel .btn-secondary {{
+            color: #0284C7 !important;
+            border-color: #BAE6FD !important;
+            background-color: #F0F9FF !important;
+        }}
+        .o_control_panel .btn-outline-primary:hover,
+        .btn-outline-primary:hover {{
             background-color: {primary_accent} !important;
             border-color: {primary_accent} !important;
+            color: #FFFFFF !important;
+        }}
+
+        /* 6. Smart Buttons & Stats ('Documentos', 'Vendido', 'Reglas', 'Entrada') */
+        .oe_stat_button,
+        .oe_stat_button .o_stat_value,
+        .oe_stat_button .o_stat_info,
+        .oe_stat_button .o_button_icon,
+        .oe_stat_button i,
+        .o_stat_text {{
+            color: #0369A1 !important;
+        }}
+        .oe_stat_button:hover {{
+            background-color: #F0F9FF !important;
+            border-color: #BAE6FD !important;
+        }}
+
+        /* 7. Breadcrumbs & Titles */
+        .o_control_panel .breadcrumb-item a,
+        .o_control_panel .o_breadcrumb .o_back_button,
+        .o_control_panel .o_last_breadcrumb_item {{
+            color: #0369A1 !important;
+        }}
+
+        /* 8. Dropdown menus */
+        .dropdown-menu .dropdown-item.active,
+        .dropdown-menu .dropdown-item:active {{
+            background-color: {primary_accent} !important;
+            color: #FFFFFF !important;
+        }}
+        .dropdown-menu .dropdown-item:hover {{
+            background-color: #F0F9FF !important;
+            color: #0369A1 !important;
         }}
         """
 
@@ -122,10 +214,10 @@ class ThemeService:
         """Inject custom CSS stylesheet rules into Odoo 20 backend views (web.webclient_bootstrap)."""
         client = get_odoo_client()
         
-        # Arch template wrapping CSS in <style> inside head block of webclient_bootstrap
+        clean_css = css_code.replace("&", "&amp;")
         arch_xml = f"""<xpath expr="//t[@t-set='head']" position="inside">
             <style id="cognitive_core_custom_theme">
-                {css_code}
+                {clean_css}
             </style>
         </xpath>"""
 
