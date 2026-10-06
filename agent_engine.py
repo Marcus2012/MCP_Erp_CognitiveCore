@@ -276,6 +276,20 @@ class AgentEngine:
             else:
                 content = "No hay colaboradores registrados en RRHH."
 
+        elif any(k in q for k in ["tema", "theme", "branding", "color", "navbar", "personalizar aspecto", "apariencia"]):
+            tool_name = "theme_get_branding"
+            res = execute_tool(tool_name, {})
+            tool_calls_info.append({"tool_name": tool_name, "arguments": {}, "result": res})
+            content = (
+                f"### 🎨 Configuración Visual y Branding de Odoo 20\n\n"
+                f"- **🏢 Empresa**: {res.get('name')}\n"
+                f"- **🔵 Color Primario**: `{res.get('primary_color')}`\n"
+                f"- **🟣 Color Secundario**: `{res.get('secondary_color')}`\n"
+                f"- **🔤 Tipografía**: `{res.get('font')}`\n"
+                f"- **✨ Tema CSS Personalizado**: {'Activo' if res.get('custom_css_active') else 'Estándar'}\n\n"
+                "💡 *Puedes pedirme cambiar los colores (ej. `#0EA5E9`), tipografía (ej. `Inter`, `Roboto`) o personalizar la barra superior (navbar).*"
+            )
+
         else:
             # General search across CRM, contacts and products
             c_res = execute_tool("contacts_search", {"query": last_user_message, "limit": 3})

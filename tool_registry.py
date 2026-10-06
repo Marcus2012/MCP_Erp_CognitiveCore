@@ -13,6 +13,7 @@ from services.projects_service import ProjectsService
 from services.hr_service import HRService
 from services.activities_calendar_service import ActivitiesCalendarService
 from services.analytics_service import AnalyticsService
+from services.theme_service import ThemeService
 
 TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     # --- Analytics & Dashboard ---
@@ -827,6 +828,79 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             description=args.get("description"),
             location=args.get("location")
         )
+    },
+
+    # --- Theme & Branding ---
+    {
+        "name": "theme_get_branding",
+        "category": "Tema & Branding",
+        "description": "Consultar los colores corporativos actuales (primario, secundario), tipografía y configuración de marca del ERP.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "company_id": {"type": "integer", "default": 1}
+            },
+            "required": []
+        },
+        "func": lambda args: ThemeService.get_branding(company_id=args.get("company_id", 1))
+    },
+    {
+        "name": "theme_update_branding",
+        "category": "Tema & Branding",
+        "description": "Actualizar colores corporativos (primario, secundario), tipografía o razón social de la empresa en Odoo.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "company_id": {"type": "integer", "default": 1},
+                "primary_color": {"type": "string", "description": "Color primario en formato Hex (ej. '#0EA5E9' o '#427293')"},
+                "secondary_color": {"type": "string", "description": "Color secundario en formato Hex (ej. '#092D53')"},
+                "font": {"type": "string", "description": "Tipografía (ej. 'Lato', 'Roboto', 'Inter', 'Montserrat')"},
+                "name": {"type": "string", "description": "Nombre o razón social de la empresa"}
+            },
+            "required": []
+        },
+        "func": lambda args: ThemeService.update_branding(
+            company_id=args.get("company_id", 1),
+            primary_color=args.get("primary_color"),
+            secondary_color=args.get("secondary_color"),
+            font=args.get("font"),
+            name=args.get("name")
+        )
+    },
+    {
+        "name": "theme_set_navbar_theme",
+        "category": "Tema & Branding",
+        "description": "Personalizar y aplicar un tema visual para la barra superior (navbar) del administrador de Odoo 20 con degradados y acentos.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "navbar_bg_start": {"type": "string", "description": "Color inicial del degradado del navbar (ej. '#092D53')", "default": "#092D53"},
+                "navbar_bg_end": {"type": "string", "description": "Color final del degradado del navbar (ej. '#1E3A8A')", "default": "#1E3A8A"},
+                "navbar_text_color": {"type": "string", "description": "Color de texto y menús (ej. '#FFFFFF')", "default": "#FFFFFF"},
+                "primary_accent": {"type": "string", "description": "Color de acento y botones principales (ej. '#0EA5E9')", "default": "#0EA5E9"}
+            },
+            "required": []
+        },
+        "func": lambda args: ThemeService.set_navbar_theme(
+            navbar_bg_start=args.get("navbar_bg_start", "#092D53"),
+            navbar_bg_end=args.get("navbar_bg_end", "#1E3A8A"),
+            navbar_text_color=args.get("navbar_text_color", "#FFFFFF"),
+            primary_accent=args.get("primary_accent", "#0EA5E9")
+        )
+    },
+    {
+        "name": "theme_remove_custom_css",
+        "category": "Tema & Branding",
+        "description": "Desactivar el tema visual personalizado y restaurar los estilos estándar de Odoo 20.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "func": lambda args: ThemeService.remove_custom_css()
+    },
+    {
+        "name": "theme_list_fonts",
+        "category": "Tema & Branding",
+        "description": "Listar tipografías corporativas recomendadas para Odoo.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+        "func": lambda args: ThemeService.list_available_fonts()
     }
 ]
 

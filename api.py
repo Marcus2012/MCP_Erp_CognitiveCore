@@ -196,6 +196,16 @@ def get_project_tasks(limit: int = 25, search: Optional[str] = None):
 def get_hr_employees(limit: int = 25, search: Optional[str] = None):
     return execute_tool("hr_list_employees", {"limit": limit, "search_term": search})
 
+@app.get("/api/theme")
+def get_theme_branding():
+    """Get current Odoo backend branding, colors, and typography."""
+    return execute_tool("theme_get_branding", {})
+
+@app.post("/api/theme/navbar")
+def set_navbar_theme(payload: Dict[str, Any] = Body(...)):
+    """Set custom navbar colors and primary accent."""
+    return execute_tool("theme_set_navbar_theme", payload)
+
 # --- Main Runner ---
 if __name__ == "__main__":
     import uvicorn
