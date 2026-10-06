@@ -118,18 +118,16 @@ class ThemeService:
         return ThemeService.inject_custom_css(css_code=css_rules, name="Cognitive Core Navbar Theme")
 
     @staticmethod
-    def inject_custom_css(css_code: str, name: str = "Custom CSS Theme") -> Dict[str, Any]:
-        """Inject custom CSS stylesheet rules into Odoo backend views."""
+    def inject_custom_css(css_code: str, name: str = "Cognitive Core Backend Theme") -> Dict[str, Any]:
+        """Inject custom CSS stylesheet rules into Odoo 20 backend views (web.webclient_bootstrap)."""
         client = get_odoo_client()
         
-        # Arch template wrapping CSS in <style>
-        arch_xml = f"""
-        <xpath expr="." position="inside">
-            <style>
+        # Arch template wrapping CSS in <style> inside head block of webclient_bootstrap
+        arch_xml = f"""<xpath expr="//t[@t-set='head']" position="inside">
+            <style id="cognitive_core_custom_theme">
                 {css_code}
             </style>
-        </xpath>
-        """
+        </xpath>"""
 
         # Find existing custom view or create new one
         existing = client.search_read(
@@ -146,24 +144,23 @@ class ThemeService:
             })
             action = "updated"
         else:
-            # Find inherit view target (web.layout)
+            # Find inherit view target (web.webclient_bootstrap, key='web.webclient_bootstrap')
             target_views = client.search_read(
                 "ir.ui.view",
-                domain=[("name", "=", "web.layout")],
+                domain=[("key", "=", "web.webclient_bootstrap")],
                 fields=["id"],
                 limit=1
             )
-            inherit_id = target_views[0]["id"] if target_views else False
+            inherit_id = target_views[0]["id"] if target_views else 197
 
             view_values = {
                 "name": name,
                 "key": ThemeService.CUSTOM_VIEW_KEY,
                 "type": "qweb",
+                "inherit_id": inherit_id,
                 "arch": arch_xml,
                 "active": True,
             }
-            if inherit_id:
-                view_values["inherit_id"] = inherit_id
 
             view_id = client.create("ir.ui.view", view_values)
             action = "created"
