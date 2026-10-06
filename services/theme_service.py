@@ -86,53 +86,82 @@ class ThemeService:
         css_rules = f"""
         /* --- Cognitive Core Custom Backend Theme --- */
         
+        :root {{
+            --Navbar-entry-backgroundColor: rgba(255, 255, 255, 0.12) !important;
+            --Navbar-entry-color: {navbar_text_color} !important;
+            --o-navbar-bg: {navbar_bg_start} !important;
+            --primary: {primary_accent} !important;
+        }}
+
         /* 1. Main Navbar Header */
         .o_main_navbar {{
+            --Navbar-entry-backgroundColor: rgba(255, 255, 255, 0.12) !important;
+            --Navbar-entry-color: {navbar_text_color} !important;
             background: linear-gradient(135deg, {navbar_bg_start} 0%, {navbar_bg_end} 100%) !important;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08) !important;
         }}
         
-        /* 2. Navbar Links, Menus & Text */
+        /* 2. All Navbar Buttons, Dropdowns & Tabs (Overrides navbar.scss:145) */
         .o_main_navbar .o_nav_entry,
         .o_main_navbar .o_menu_brand,
-        .o_main_navbar .o_menu_sections .nav-link,
+        .o_main_navbar .o_menu_sections .o_nav_entry,
+        .o_main_navbar .o_menu_sections .dropdown-toggle,
+        .o_main_navbar .o_menu_sections button,
+        .o_main_navbar .o_menu_sections a,
         .o_main_navbar .o_menu_systray .o_nav_entry,
+        .o_main_navbar .o_menu_systray .dropdown-toggle,
+        .o_main_navbar .o_menu_systray button,
         .o_main_navbar .dropdown-toggle,
+        .o_main_navbar button.o-dropdown,
         .o_main_navbar a {{
+            background: rgba(255, 255, 255, 0.12) !important;
+            background-color: rgba(255, 255, 255, 0.12) !important;
             color: {navbar_text_color} !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 6px !important;
+            margin-right: 4px !important;
             font-weight: 500 !important;
         }}
 
-        /* 3. Active Menu Pill / Tab (replaces purple active button) */
+        /* 3. Hover & Active states */
+        .o_main_navbar .o_menu_sections .o_nav_entry:hover,
+        .o_main_navbar .o_menu_sections .dropdown-toggle:hover,
+        .o_main_navbar .o_menu_sections button:hover,
+        .o_main_navbar .o_menu_systray .o_nav_entry:hover,
+        .o_main_navbar .o_menu_systray .dropdown-toggle:hover,
+        .o_main_navbar .o_nav_entry:hover,
+        .o_main_navbar .dropdown-toggle:hover {{
+            background: rgba(255, 255, 255, 0.25) !important;
+            background-color: rgba(255, 255, 255, 0.25) !important;
+            color: #FFFFFF !important;
+        }}
+
         .o_main_navbar .o_menu_sections .active,
         .o_main_navbar .o_menu_sections .nav-link.active,
         .o_main_navbar .o_menu_sections .dropdown-toggle.active,
-        .o_main_navbar .o_nav_entry.active,
-        .o_main_navbar .dropdown-item.active {{
-            background-color: rgba(255, 255, 255, 0.25) !important;
+        .o_main_navbar .o_menu_sections .o_nav_entry.active,
+        .o_main_navbar .o_menu_sections button[aria-expanded="true"],
+        .o_main_navbar .o_menu_sections .dropdown-toggle[aria-expanded="true"] {{
+            background: rgba(14, 165, 233, 0.35) !important;
+            background-color: rgba(14, 165, 233, 0.35) !important;
+            border-color: {primary_accent} !important;
             color: #FFFFFF !important;
-            border-radius: 6px !important;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
-        }}
-        
-        .o_main_navbar .o_menu_sections .nav-link:hover,
-        .o_main_navbar .o_nav_entry:hover,
-        .o_main_navbar .dropdown-toggle:hover {{
-            background-color: rgba(255, 255, 255, 0.15) !important;
-            border-radius: 6px !important;
+            box-shadow: 0 0 8px rgba(14, 165, 233, 0.4) !important;
         }}
 
-        /* 4. User Avatar Icon (Top Right 'K' Circle) */
+        /* 4. User Avatar Icon ('K' Circle) */
         .o_main_navbar .o_user_avatar,
         .o_main_navbar .o_avatar,
         .o_main_navbar .o_user_menu .rounded-circle,
         .o_main_navbar .o_user_menu span.rounded-circle,
         .o_main_navbar span.bg-view-avatar,
-        .o_main_navbar div.rounded-circle {{
+        .o_main_navbar div.rounded-circle,
+        .o_main_navbar .o_user_menu .o_avatar_badge {{
             background: linear-gradient(135deg, {primary_accent} 0%, #0284C7 100%) !important;
+            background-color: {primary_accent} !important;
             color: #FFFFFF !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            border: 1px solid rgba(255, 255, 255, 0.4) !important;
             font-weight: bold !important;
         }}
 
