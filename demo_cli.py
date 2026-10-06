@@ -64,7 +64,9 @@ def main():
                 data = json.loads(server.contacts_search(limit=10))
                 for c in data:
                     vat_str = f" | RUC/DNI: {c['vat']}" if c.get('vat') else ""
-                    print(f" • [ID {c['id']}] {c['name']}{vat_str} | Email: {c.get('email') or 'N/A'}")
+                    phone_str = f" | 📱 Tel/Cel: {c['phone']}" if c.get('phone') else ""
+                    email_str = f" | ✉️ Email: {c['email']}" if c.get('email') else ""
+                    print(f" • [ID {c['id']}] {c['name']}{vat_str}{phone_str}{email_str}")
                 if not data:
                     print("No se encontraron contactos.")
 

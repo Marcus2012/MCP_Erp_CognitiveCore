@@ -207,11 +207,20 @@ class AgentEngine:
             res = execute_tool(tool_name, {"limit": 15})
             tool_calls_info.append({"tool_name": tool_name, "arguments": {"limit": 15}, "result": res})
             if res:
-                items = "\n".join([
-                    f"- **[ID {c['id']}] {c['name']}** | {('RUC/DNI: ' + c['vat'] + ' | ') if c.get('vat') else ''}Email: {c.get('email') or 'Sin correo'}"
-                    for c in res
-                ])
-                content = f"### 👥 Directorio de Contactos ({len(res)})\n\n{items}"
+                formatted_contacts = []
+                for c in res:
+                    parts = [f"- **[ID {c['id']}] {c['name']}**"]
+                    if c.get('vat'):
+                        parts.append(f"RUC/DNI: {c['vat']}")
+                    if c.get('phone'):
+                        parts.append(f"📱 Tel/Cel: `{c['phone']}`")
+                    if c.get('email'):
+                        parts.append(f"✉️ Email: {c['email']}")
+                    elif not c.get('phone'):
+                        parts.append("Sin datos de contacto")
+                    formatted_contacts.append(" | ".join(parts))
+                
+                content = f"### 👥 Directorio de Contactos ({len(res)})\n\n" + "\n".join(formatted_contacts)
             else:
                 content = "No se encontraron contactos registrados."
 
