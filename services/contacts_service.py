@@ -35,7 +35,7 @@ class ContactsService:
             domain.append(("supplier_rank", ">", 0))
 
         fields = [
-            "id", "name", "email", "phone", "mobile", "vat",
+            "id", "name", "email", "phone", "vat",
             "is_company", "street", "city", "country_id", "commercial_company_name"
         ]
         return client.search_read("res.partner", domain=domain, fields=fields, limit=limit, order="name asc")
@@ -45,7 +45,7 @@ class ContactsService:
         """Get complete contact card with commercial details."""
         client = get_odoo_client()
         fields = [
-            "id", "name", "email", "phone", "mobile", "vat", "is_company",
+            "id", "name", "email", "phone", "vat", "is_company",
             "street", "street2", "city", "state_id", "country_id",
             "customer_rank", "supplier_rank", "comment", "user_id",
             "total_invoiced", "credit", "debit"
