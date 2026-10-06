@@ -1,6 +1,7 @@
 """
 Tool Registry for Cognitive ERP (Odoo 20).
 Defines schemas, metadata, and callable functions for both MCP and FastAPI Agent.
+Provides full CRU (Create, Read, Update - NO Delete) capabilities across all ERP modules.
 """
 
 from typing import Any, Callable, Dict, List
@@ -16,7 +17,7 @@ from services.analytics_service import AnalyticsService
 from services.theme_service import ThemeService
 
 TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
-    # --- Analytics & Dashboard ---
+    # --- Analytics, KPIs & Generic ORM CRU ---
     {
         "name": "erp_dashboard_kpis",
         "category": "Analytics",
@@ -31,7 +32,7 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "name": "odoo_generic_query",
         "category": "Analytics",
-        "description": "Ejecutar una consulta ORM flexible en cualquier modelo de Odoo (search_read, fields_get, search_count).",
+        "description": "Ejecutar una consulta ORM flexible de lectura en cualquier modelo de Odoo (search_read, fields_get, search_count).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -53,6 +54,61 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             limit=args.get("limit", 20),
             offset=args.get("offset", 0),
             order=args.get("order")
+        )
+    },
+    {
+        "name": "odoo_create_record",
+        "category": "Analytics",
+        "description": "Crear un registro genérico en cualquier modelo de Odoo (Create).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model": {"type": "string", "description": "Nombre técnico del modelo Odoo (ej. 'res.partner', 'project.project')"},
+                "values": {"type": "object", "description": "Diccionario de campos y valores a insertar"}
+            },
+            "required": ["model", "values"]
+        },
+        "func": lambda args: AnalyticsService.create_record(
+            model=args["model"],
+            values=args["values"]
+        )
+    },
+    {
+        "name": "odoo_read_record",
+        "category": "Analytics",
+        "description": "Leer los datos de un registro específico en cualquier modelo de Odoo por su ID (Read).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model": {"type": "string", "description": "Nombre técnico del modelo Odoo"},
+                "record_id": {"type": "integer", "description": "ID del registro a leer"},
+                "fields": {"type": "array", "items": {"type": "string"}, "description": "Lista opcional de campos específicos a leer"}
+            },
+            "required": ["model", "record_id"]
+        },
+        "func": lambda args: AnalyticsService.read_record(
+            model=args["model"],
+            record_id=args["record_id"],
+            fields=args.get("fields")
+        )
+    },
+    {
+        "name": "odoo_update_record",
+        "category": "Analytics",
+        "description": "Actualizar campos de un registro específico en cualquier modelo de Odoo (Update).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "model": {"type": "string", "description": "Nombre técnico del modelo Odoo"},
+                "record_id": {"type": "integer", "description": "ID del registro a actualizar"},
+                "values": {"type": "object", "description": "Diccionario de campos y nuevos valores a actualizar"}
+            },
+            "required": ["model", "record_id", "values"]
+        },
+        "func": lambda args: AnalyticsService.update_record(
+            model=args["model"],
+            record_id=args["record_id"],
+            values=args["values"]
         )
     },
 
@@ -134,15 +190,19 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "name": "crm_update_lead",
         "category": "CRM",
-        "description": "Actualizar campos de una oportunidad CRM (etapa, monto esperado, probabilidad, notas).",
+        "description": "Actualizar campos de una oportunidad CRM (etapa, monto esperado, probabilidad, notas, cliente).",
         "parameters": {
             "type": "object",
             "properties": {
                 "lead_id": {"type": "integer", "description": "ID de la oportunidad a actualizar"},
+                "name": {"type": "string", "description": "Nuevo nombre o título de la oportunidad"},
                 "stage_id": {"type": "integer", "description": "Nuevo ID de etapa"},
                 "expected_revenue": {"type": "number", "description": "Nuevo monto estimado"},
                 "probability": {"type": "number", "description": "Nueva probabilidad (0-100)"},
-                "description": {"type": "string", "description": "Notas o descripción adicional"}
+                "description": {"type": "string", "description": "Notas o descripción adicional"},
+                "partner_id": {"type": "integer", "description": "ID del cliente vinculado"},
+                "phone": {"type": "string", "description": "Teléfono"},
+                "email_from": {"type": "string", "description": "Correo"}
             },
             "required": ["lead_id"]
         },
@@ -252,6 +312,68 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         )
     },
     {
+        "name": "sales_update_order",
+        "category": "Ventas",
+        "description": "Actualizar campos principales de una orden de venta o cotización (cliente, notas, términos de pago, fecha de validez).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "order_id": {"type": "integer", "description": "ID de la orden de venta"},
+                "partner_id": {"type": "integer", "description": "ID del cliente"},
+                "payment_term_id": {"type": "integer", "description": "ID del plazo de pago"},
+                "note": {"type": "string", "description": "Notas o términos"},
+                "validity_date": {"type": "string", "description": "Fecha de validez de la oferta (YYYY-MM-DD)"}
+            },
+            "required": ["order_id"]
+        },
+        "func": lambda args: SalesService.update_order(
+            order_id=args["order_id"],
+            values={k: v for k, v in args.items() if k != "order_id" and v is not None}
+        )
+    },
+    {
+        "name": "sales_add_order_line",
+        "category": "Ventas",
+        "description": "Agregar una nueva línea de producto a una orden de venta o cotización existente.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "order_id": {"type": "integer", "description": "ID de la orden de venta"},
+                "product_id": {"type": "integer", "description": "ID del producto a agregar"},
+                "qty": {"type": "number", "description": "Cantidad", "default": 1.0},
+                "price_unit": {"type": "number", "description": "Precio unitario personalizado (opcional)"},
+                "description": {"type": "string", "description": "Descripción personalizada de la línea (opcional)"}
+            },
+            "required": ["order_id", "product_id"]
+        },
+        "func": lambda args: SalesService.add_order_line(
+            order_id=args["order_id"],
+            product_id=args["product_id"],
+            qty=args.get("qty", 1.0),
+            price_unit=args.get("price_unit"),
+            description=args.get("description")
+        )
+    },
+    {
+        "name": "sales_update_order_line",
+        "category": "Ventas",
+        "description": "Actualizar una línea existente dentro de una orden de venta (cantidad, precio unitario, descripción).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "line_id": {"type": "integer", "description": "ID de la línea de orden de venta"},
+                "product_uom_qty": {"type": "number", "description": "Nueva cantidad"},
+                "price_unit": {"type": "number", "description": "Nuevo precio unitario"},
+                "name": {"type": "string", "description": "Nueva descripción"}
+            },
+            "required": ["line_id"]
+        },
+        "func": lambda args: SalesService.update_order_line(
+            line_id=args["line_id"],
+            values={k: v for k, v in args.items() if k != "line_id" and v is not None}
+        )
+    },
+    {
         "name": "sales_confirm_order",
         "category": "Ventas",
         "description": "Confirmar una cotización en borrador para convertirla en Orden de Venta en firme.",
@@ -355,6 +477,50 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         )
     },
     {
+        "name": "invoices_update_invoice",
+        "category": "Facturación",
+        "description": "Actualizar datos de una factura en borrador (fecha de emisión, vencimiento, referencia, cliente, notas).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "invoice_id": {"type": "integer", "description": "ID de la factura"},
+                "partner_id": {"type": "integer", "description": "ID del cliente/proveedor"},
+                "invoice_date": {"type": "string", "description": "Fecha de emisión (YYYY-MM-DD)"},
+                "invoice_date_due": {"type": "string", "description": "Fecha de vencimiento (YYYY-MM-DD)"},
+                "ref": {"type": "string", "description": "Referencia física"},
+                "narration": {"type": "string", "description": "Términos o notas"}
+            },
+            "required": ["invoice_id"]
+        },
+        "func": lambda args: InvoicingService.update_invoice(
+            invoice_id=args["invoice_id"],
+            values={k: v for k, v in args.items() if k != "invoice_id" and v is not None}
+        )
+    },
+    {
+        "name": "invoices_add_line",
+        "category": "Facturación",
+        "description": "Agregar una nueva línea a una factura en borrador.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "invoice_id": {"type": "integer", "description": "ID de la factura"},
+                "name": {"type": "string", "description": "Descripción del concepto o servicio"},
+                "price_unit": {"type": "number", "description": "Precio unitario"},
+                "quantity": {"type": "number", "description": "Cantidad", "default": 1.0},
+                "product_id": {"type": "integer", "description": "ID del producto (opcional)"}
+            },
+            "required": ["invoice_id", "name", "price_unit"]
+        },
+        "func": lambda args: InvoicingService.add_invoice_line(
+            invoice_id=args["invoice_id"],
+            name=args["name"],
+            price_unit=args["price_unit"],
+            quantity=args.get("quantity", 1.0),
+            product_id=args.get("product_id")
+        )
+    },
+    {
         "name": "invoices_post",
         "category": "Facturación",
         "description": "Validar y Publicar una factura en borrador (asigna numeración oficial en el ERP).",
@@ -448,20 +614,42 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "name": "inventory_update_product",
         "category": "Inventario",
-        "description": "Actualizar precios o descripción de un producto.",
+        "description": "Actualizar precios, SKU o descripción de un producto existente.",
         "parameters": {
             "type": "object",
             "properties": {
                 "product_id": {"type": "integer", "description": "ID del producto"},
+                "name": {"type": "string", "description": "Nuevo nombre del producto"},
                 "list_price": {"type": "number", "description": "Nuevo precio de venta"},
                 "standard_price": {"type": "number", "description": "Nuevo costo"},
-                "description": {"type": "string", "description": "Nueva descripción"}
+                "default_code": {"type": "string", "description": "Nuevo código SKU"},
+                "barcode": {"type": "string", "description": "Código de barras"},
+                "description_sale": {"type": "string", "description": "Nueva descripción"}
             },
             "required": ["product_id"]
         },
         "func": lambda args: InventoryService.update_product(
             product_id=args["product_id"],
             values={k: v for k, v in args.items() if k != "product_id" and v is not None}
+        )
+    },
+    {
+        "name": "inventory_update_stock_quantity",
+        "category": "Inventario",
+        "description": "Ajustar o actualizar la cantidad de stock disponible (on-hand) de un producto.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "integer", "description": "ID del producto a ajustar stock"},
+                "new_quantity": {"type": "number", "description": "Nueva cantidad física real de inventario"},
+                "location_id": {"type": "integer", "description": "ID de la ubicación de inventario (opcional)"}
+            },
+            "required": ["product_id", "new_quantity"]
+        },
+        "func": lambda args: InventoryService.update_stock_quantity(
+            product_id=args["product_id"],
+            new_quantity=args["new_quantity"],
+            location_id=args.get("location_id")
         )
     },
     {
@@ -485,6 +673,38 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             limit=args.get("limit", 20)
         )
     },
+    {
+        "name": "inventory_get_picking",
+        "category": "Inventario",
+        "description": "Obtener los datos detallados de una transferencia o guía de remisión/despacho con sus movimientos.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "picking_id": {"type": "integer", "description": "ID de la transferencia de stock"}
+            },
+            "required": ["picking_id"]
+        },
+        "func": lambda args: InventoryService.get_picking(picking_id=args["picking_id"])
+    },
+    {
+        "name": "inventory_update_picking",
+        "category": "Inventario",
+        "description": "Actualizar campos de una transferencia de inventario (fecha programada, origen, cliente).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "picking_id": {"type": "integer", "description": "ID de la transferencia"},
+                "scheduled_date": {"type": "string", "description": "Fecha programada (YYYY-MM-DD HH:MM:SS)"},
+                "origin": {"type": "string", "description": "Documento origen"},
+                "partner_id": {"type": "integer", "description": "ID del cliente o proveedor"}
+            },
+            "required": ["picking_id"]
+        },
+        "func": lambda args: InventoryService.update_picking(
+            picking_id=args["picking_id"],
+            values={k: v for k, v in args.items() if k != "picking_id" and v is not None}
+        )
+    },
 
     # --- Contacts & Partners ---
     {
@@ -494,7 +714,7 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Nombre, RUC, DNI o email"},
+                "query": {"type": "string", "description": "Nombre, RUC, DNI, teléfono o email"},
                 "is_company": {"type": "boolean", "description": "True para empresas, False para personas"},
                 "is_customer": {"type": "boolean", "description": "True para clientes"},
                 "is_supplier": {"type": "boolean", "description": "True para proveedores"},
@@ -559,7 +779,7 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "name": "contacts_update",
         "category": "Contactos",
-        "description": "Actualizar datos de un contacto existente.",
+        "description": "Actualizar datos de un contacto existente (nombre, teléfono, correo, RUC, dirección, notas).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -569,7 +789,8 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
                 "phone": {"type": "string"},
                 "vat": {"type": "string"},
                 "street": {"type": "string"},
-                "city": {"type": "string"}
+                "city": {"type": "string"},
+                "comment": {"type": "string"}
             },
             "required": ["partner_id"]
         },
@@ -595,6 +816,66 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         "func": lambda args: ProjectsService.list_projects(
             search_term=args.get("search_term"),
             limit=args.get("limit", 20)
+        )
+    },
+    {
+        "name": "projects_get_project",
+        "category": "Proyectos",
+        "description": "Obtener detalles completos de un proyecto específico.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "integer", "description": "ID del proyecto"}
+            },
+            "required": ["project_id"]
+        },
+        "func": lambda args: ProjectsService.get_project(project_id=args["project_id"])
+    },
+    {
+        "name": "projects_create_project",
+        "category": "Proyectos",
+        "description": "Crear un nuevo proyecto en Odoo.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Nombre del proyecto"},
+                "partner_id": {"type": "integer", "description": "ID del cliente vinculado (opcional)"},
+                "user_id": {"type": "integer", "description": "ID del gerente o responsable del proyecto (opcional)"},
+                "description": {"type": "string", "description": "Descripción o alcance del proyecto"},
+                "date_start": {"type": "string", "description": "Fecha de inicio (YYYY-MM-DD)"},
+                "date": {"type": "string", "description": "Fecha de finalización (YYYY-MM-DD)"}
+            },
+            "required": ["name"]
+        },
+        "func": lambda args: ProjectsService.create_project(
+            name=args["name"],
+            partner_id=args.get("partner_id"),
+            user_id=args.get("user_id"),
+            description=args.get("description"),
+            date_start=args.get("date_start"),
+            date=args.get("date")
+        )
+    },
+    {
+        "name": "projects_update_project",
+        "category": "Proyectos",
+        "description": "Actualizar campos de un proyecto existente (nombre, responsable, fechas, descripción).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "integer", "description": "ID del proyecto"},
+                "name": {"type": "string"},
+                "partner_id": {"type": "integer"},
+                "user_id": {"type": "integer"},
+                "description": {"type": "string"},
+                "date_start": {"type": "string"},
+                "date": {"type": "string"}
+            },
+            "required": ["project_id"]
+        },
+        "func": lambda args: ProjectsService.update_project(
+            project_id=args["project_id"],
+            values={k: v for k, v in args.items() if k != "project_id" and v is not None}
         )
     },
     {
@@ -661,7 +942,7 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "name": "projects_update_task",
         "category": "Proyectos",
-        "description": "Actualizar propiedades de una tarea (etapa, fecha límite, prioridad o descripción).",
+        "description": "Actualizar propiedades de una tarea (etapa, fecha límite, prioridad, asignados o descripción).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -714,11 +995,112 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         "func": lambda args: HRService.get_employee(employee_id=args["employee_id"])
     },
     {
+        "name": "hr_create_employee",
+        "category": "Recursos Humanos",
+        "description": "Crear un nuevo empleado / colaborador en Odoo.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Nombre completo del colaborador"},
+                "job_title": {"type": "string", "description": "Puesto o cargo"},
+                "work_email": {"type": "string", "description": "Correo corporativo"},
+                "work_phone": {"type": "string", "description": "Teléfono corporativo"},
+                "mobile_phone": {"type": "string", "description": "Celular"},
+                "department_id": {"type": "integer", "description": "ID del departamento"},
+                "parent_id": {"type": "integer", "description": "ID del gerente o supervisor directo"}
+            },
+            "required": ["name"]
+        },
+        "func": lambda args: HRService.create_employee(
+            name=args["name"],
+            job_title=args.get("job_title"),
+            work_email=args.get("work_email"),
+            work_phone=args.get("work_phone"),
+            mobile_phone=args.get("mobile_phone"),
+            department_id=args.get("department_id"),
+            parent_id=args.get("parent_id")
+        )
+    },
+    {
+        "name": "hr_update_employee",
+        "category": "Recursos Humanos",
+        "description": "Actualizar campos de un empleado (cargo, departamento, supervisor, teléfonos, correo).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "employee_id": {"type": "integer", "description": "ID del empleado"},
+                "name": {"type": "string"},
+                "job_title": {"type": "string"},
+                "work_email": {"type": "string"},
+                "work_phone": {"type": "string"},
+                "mobile_phone": {"type": "string"},
+                "department_id": {"type": "integer"},
+                "parent_id": {"type": "integer"}
+            },
+            "required": ["employee_id"]
+        },
+        "func": lambda args: HRService.update_employee(
+            employee_id=args["employee_id"],
+            values={k: v for k, v in args.items() if k != "employee_id" and v is not None}
+        )
+    },
+    {
         "name": "hr_list_departments",
         "category": "Recursos Humanos",
-        "description": "Listar los departamentos de la empresa.",
+        "description": "Listar los departamentos de la empresa con conteo de empleados.",
         "parameters": {"type": "object", "properties": {}, "required": []},
         "func": lambda args: HRService.list_departments()
+    },
+    {
+        "name": "hr_get_department",
+        "category": "Recursos Humanos",
+        "description": "Obtener los datos de un departamento específico.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "department_id": {"type": "integer", "description": "ID del departamento"}
+            },
+            "required": ["department_id"]
+        },
+        "func": lambda args: HRService.get_department(department_id=args["department_id"])
+    },
+    {
+        "name": "hr_create_department",
+        "category": "Recursos Humanos",
+        "description": "Crear un nuevo departamento en la empresa.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Nombre del departamento"},
+                "manager_id": {"type": "integer", "description": "ID del empleado gerente (opcional)"},
+                "parent_id": {"type": "integer", "description": "ID del departamento padre (opcional)"}
+            },
+            "required": ["name"]
+        },
+        "func": lambda args: HRService.create_department(
+            name=args["name"],
+            manager_id=args.get("manager_id"),
+            parent_id=args.get("parent_id")
+        )
+    },
+    {
+        "name": "hr_update_department",
+        "category": "Recursos Humanos",
+        "description": "Actualizar campos de un departamento.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "department_id": {"type": "integer", "description": "ID del departamento"},
+                "name": {"type": "string"},
+                "manager_id": {"type": "integer"},
+                "parent_id": {"type": "integer"}
+            },
+            "required": ["department_id"]
+        },
+        "func": lambda args: HRService.update_department(
+            department_id=args["department_id"],
+            values={k: v for k, v in args.items() if k != "department_id" and v is not None}
+        )
     },
 
     # --- Activities & Calendar ---
@@ -750,12 +1132,12 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "res_model": {"type": "string", "description": "Modelo Odoo (ej. 'crm.lead', 'res.partner')"},
-                "res_id": {"type": "integer", "description": "ID del registro"},
-                "summary": {"type": "string", "description": "Resumen o título de la actividad"},
+                "res_model": {"type": "string", "description": "Modelo técnico (ej. 'crm.lead', 'res.partner')"},
+                "res_id": {"type": "integer", "description": "ID del registro a vincular"},
+                "summary": {"type": "string", "description": "Título o resumen de la actividad"},
                 "date_deadline": {"type": "string", "description": "Fecha límite (YYYY-MM-DD)"},
                 "note": {"type": "string", "description": "Detalles o notas"},
-                "user_id": {"type": "integer", "description": "ID del usuario asignado"}
+                "activity_type_id": {"type": "integer", "description": "ID del tipo de actividad"}
             },
             "required": ["res_model", "res_id", "summary", "date_deadline"]
         },
@@ -765,18 +1147,38 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             summary=args["summary"],
             date_deadline=args["date_deadline"],
             note=args.get("note"),
-            user_id=args.get("user_id")
+            activity_type_id=args.get("activity_type_id")
+        )
+    },
+    {
+        "name": "activities_update",
+        "category": "Agenda",
+        "description": "Actualizar campos de una actividad programada (resumen, fecha límite, notas).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "activity_id": {"type": "integer", "description": "ID de la actividad"},
+                "summary": {"type": "string", "description": "Nuevo resumen"},
+                "date_deadline": {"type": "string", "description": "Nueva fecha límite (YYYY-MM-DD)"},
+                "note": {"type": "string", "description": "Nuevas notas"},
+                "user_id": {"type": "integer", "description": "ID del nuevo usuario asignado"}
+            },
+            "required": ["activity_id"]
+        },
+        "func": lambda args: ActivitiesCalendarService.update_activity(
+            activity_id=args["activity_id"],
+            values={k: v for k, v in args.items() if k != "activity_id" and v is not None}
         )
     },
     {
         "name": "activities_mark_done",
         "category": "Agenda",
-        "description": "Marcar una actividad programada como completada con comentarios de cierre.",
+        "description": "Marcar una actividad como completada y opcionalmente registrar feedback.",
         "parameters": {
             "type": "object",
             "properties": {
                 "activity_id": {"type": "integer", "description": "ID de la actividad"},
-                "feedback": {"type": "string", "description": "Comentario o resultado del seguimiento"}
+                "feedback": {"type": "string", "description": "Comentario de lo ocurrido o resultado"}
             },
             "required": ["activity_id"]
         },
@@ -792,8 +1194,8 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "start_date": {"type": "string", "description": "Fecha inicial (YYYY-MM-DD)"},
-                "end_date": {"type": "string", "description": "Fecha final (YYYY-MM-DD)"},
+                "start_date": {"type": "string", "description": "Desde fecha (YYYY-MM-DD)"},
+                "end_date": {"type": "string", "description": "Hasta fecha (YYYY-MM-DD)"},
                 "limit": {"type": "integer", "default": 20}
             },
             "required": []
@@ -803,6 +1205,19 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             end_date=args.get("end_date"),
             limit=args.get("limit", 20)
         )
+    },
+    {
+        "name": "calendar_get_meeting",
+        "category": "Agenda",
+        "description": "Obtener los datos detallados de una reunión o evento del calendario.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "integer", "description": "ID del evento de calendario"}
+            },
+            "required": ["event_id"]
+        },
+        "func": lambda args: ActivitiesCalendarService.get_calendar_event(event_id=args["event_id"])
     },
     {
         "name": "calendar_create_meeting",
@@ -827,6 +1242,28 @@ TOOLS_DEFINITIONS: List[Dict[str, Any]] = [
             partner_ids=args.get("partner_ids"),
             description=args.get("description"),
             location=args.get("location")
+        )
+    },
+    {
+        "name": "calendar_update_meeting",
+        "category": "Agenda",
+        "description": "Actualizar una reunión en el calendario (título, fechas de inicio/fin, ubicación, asistentes o descripción).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_id": {"type": "integer", "description": "ID del evento de calendario"},
+                "name": {"type": "string", "description": "Nuevo título"},
+                "start": {"type": "string", "description": "Nuevo inicio (YYYY-MM-DD HH:MM:SS)"},
+                "stop": {"type": "string", "description": "Nuevo fin (YYYY-MM-DD HH:MM:SS)"},
+                "partner_ids": {"type": "array", "items": {"type": "integer"}, "description": "Lista de IDs de asistentes"},
+                "description": {"type": "string", "description": "Nueva descripción"},
+                "location": {"type": "string", "description": "Nueva ubicación o link"}
+            },
+            "required": ["event_id"]
+        },
+        "func": lambda args: ActivitiesCalendarService.update_calendar_event(
+            event_id=args["event_id"],
+            values={k: v for k, v in args.items() if k != "event_id" and v is not None}
         )
     },
 

@@ -101,6 +101,10 @@ class AnalyticsService:
         Generic search/read fallback query for any Odoo model.
         Useful when AI needs to inspect custom or non-standard models.
         """
+        # Block any dangerous methods
+        if method in ["unlink", "delete", "drop", "write_raw"]:
+            raise PermissionError("Operaciones de eliminación no están permitidas por seguridad.")
+
         client = get_odoo_client()
         domain = domain or []
         
@@ -117,3 +121,29 @@ class AnalyticsService:
             return client.search_count(model, domain)
         else:
             raise ValueError(f"Method '{method}' is not allowed in safe generic query.")
+
+    @staticmethod
+    def create_record(model: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Generic Create: Create a record in any Odoo model."""
+        client = get_odoo_client()
+        new_id = client.create(model, values)
+        record = client.read(model, new_id)
+        return {"id": new_id, "model": model, "status": "created", "record": record[0] if record else {}}
+
+    @staticmethod
+    def read_record(model: str, record_id: int, fields: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Generic Read: Read fields of any specific record by model and ID."""
+        client = get_odoo_client()
+        records = client.read(model, record_id, fields=fields)
+        if not records:
+            raise ValueError(f"Record {model} with ID {record_id} not found.")
+        return records[0]
+
+    @staticmethod
+    def update_record(model: str, record_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Generic Update: Update fields of a record in any Odoo model."""
+        client = get_odoo_client()
+        client.write(model, record_id, values)
+        record = client.read(model, record_id)
+        return {"id": record_id, "model": model, "status": "updated", "record": record[0] if record else {}}
+

@@ -77,6 +77,14 @@ class ActivitiesCalendarService:
         return {"id": activity_id, "status": "completed"}
 
     @staticmethod
+    def update_activity(activity_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update fields on a scheduled activity (e.g. summary, date_deadline, note, user_id)."""
+        client = get_odoo_client()
+        client.write("mail.activity", activity_id, values)
+        activities = client.read("mail.activity", activity_id, fields=["id", "res_model", "res_id", "summary", "note", "date_deadline", "user_id", "state"])
+        return {"id": activity_id, "status": "updated", "activity": activities[0] if activities else {}}
+
+    @staticmethod
     def list_calendar_events(
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
@@ -93,6 +101,16 @@ class ActivitiesCalendarService:
 
         fields = ["id", "name", "start", "stop", "partner_ids", "user_id", "location", "description", "allday"]
         return client.search_read("calendar.event", domain=domain, fields=fields, limit=limit, order="start asc")
+
+    @staticmethod
+    def get_calendar_event(event_id: int) -> Dict[str, Any]:
+        """Get details of a specific calendar meeting or event."""
+        client = get_odoo_client()
+        fields = ["id", "name", "start", "stop", "partner_ids", "user_id", "location", "description", "allday", "duration", "alarm_ids"]
+        events = client.read("calendar.event", event_id, fields=fields)
+        if not events:
+            raise ValueError(f"Calendar event with ID {event_id} not found.")
+        return events[0]
 
     @staticmethod
     def create_calendar_event(
@@ -123,4 +141,16 @@ class ActivitiesCalendarService:
             values["location"] = location
 
         new_id = client.create("calendar.event", values)
-        return {"id": new_id, "status": "created", "name": name, "start": start, "stop": stop}
+        return {"id": new_id, "status": "created", "event": ActivitiesCalendarService.get_calendar_event(new_id)}
+
+    @staticmethod
+    def update_calendar_event(event_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update fields on a calendar meeting/event (e.g. name, start, stop, location, description, partner_ids)."""
+        client = get_odoo_client()
+        formatted_vals = dict(values)
+        if "partner_ids" in formatted_vals and isinstance(formatted_vals["partner_ids"], list):
+            formatted_vals["partner_ids"] = [(6, 0, formatted_vals["partner_ids"])]
+
+        client.write("calendar.event", event_id, formatted_vals)
+        return {"id": event_id, "status": "updated", "event": ActivitiesCalendarService.get_calendar_event(event_id)}
+

@@ -12,8 +12,52 @@ class ProjectsService:
         if search_term:
             domain.append(("name", "ilike", search_term))
 
-        fields = ["id", "name", "partner_id", "user_id", "task_count", "date_start", "date"]
+        fields = ["id", "name", "partner_id", "user_id", "task_count", "date_start", "date", "description"]
         return client.search_read("project.project", domain=domain, fields=fields, limit=limit, order="name asc")
+
+    @staticmethod
+    def get_project(project_id: int) -> Dict[str, Any]:
+        """Get full details of a specific project."""
+        client = get_odoo_client()
+        fields = ["id", "name", "partner_id", "user_id", "task_count", "date_start", "date", "description", "privacy_visibility", "tag_ids"]
+        projects = client.read("project.project", project_id, fields=fields)
+        if not projects:
+            raise ValueError(f"Project with ID {project_id} not found.")
+        return projects[0]
+
+    @staticmethod
+    def create_project(
+        name: str,
+        partner_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        description: Optional[str] = None,
+        date_start: Optional[str] = None,
+        date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new project."""
+        client = get_odoo_client()
+        values: Dict[str, Any] = {"name": name}
+        if partner_id:
+            values["partner_id"] = partner_id
+        if user_id:
+            values["user_id"] = user_id
+        if description:
+            values["description"] = description
+        if date_start:
+            values["date_start"] = date_start
+        if date:
+            values["date"] = date
+
+        new_id = client.create("project.project", values)
+        return {"id": new_id, "status": "created", "project": ProjectsService.get_project(new_id)}
+
+    @staticmethod
+    def update_project(project_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update fields on a project (name, partner_id, user_id, description, dates)."""
+        client = get_odoo_client()
+        client.write("project.project", project_id, values)
+        return {"id": project_id, "status": "updated", "project": ProjectsService.get_project(project_id)}
+
 
     @staticmethod
     def list_tasks(

@@ -108,6 +108,45 @@ class SalesService:
         return {"id": new_order_id, "status": "created", "order": SalesService.get_order(new_order_id)}
 
     @staticmethod
+    def update_order(order_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update fields on a sales order or quotation (header fields like partner_id, note, validity_date, etc.)."""
+        client = get_odoo_client()
+        client.write("sale.order", order_id, values)
+        return {"id": order_id, "status": "updated", "order": SalesService.get_order(order_id)}
+
+    @staticmethod
+    def add_order_line(
+        order_id: int,
+        product_id: int,
+        qty: float = 1.0,
+        price_unit: Optional[float] = None,
+        description: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Add a new line item to an existing sales order."""
+        client = get_odoo_client()
+        line_vals: Dict[str, Any] = {
+            "order_id": order_id,
+            "product_id": product_id,
+            "product_uom_qty": qty,
+        }
+        if price_unit is not None:
+            line_vals["price_unit"] = price_unit
+        if description:
+            line_vals["name"] = description
+
+        line_id = client.create("sale.order.line", line_vals)
+        return {"line_id": line_id, "order_id": order_id, "status": "line_added", "order": SalesService.get_order(order_id)}
+
+    @staticmethod
+    def update_order_line(line_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an existing line item on a sales order (qty, price_unit, name)."""
+        client = get_odoo_client()
+        client.write("sale.order.line", line_id, values)
+        line = client.read("sale.order.line", line_id, fields=["id", "order_id", "product_id", "product_uom_qty", "price_unit", "price_subtotal"])
+        order_id = line[0]["order_id"][0] if line and isinstance(line[0].get("order_id"), (list, tuple)) else None
+        return {"line_id": line_id, "status": "line_updated", "line": line[0] if line else {}, "order_id": order_id}
+
+    @staticmethod
     def confirm_order(order_id: int) -> Dict[str, Any]:
         """Confirm quotation into a confirmed Sales Order."""
         client = get_odoo_client()
@@ -120,3 +159,4 @@ class SalesService:
         client = get_odoo_client()
         client.execute_kw("sale.order", "action_cancel", [[order_id]])
         return {"id": order_id, "status": "cancelled", "order": SalesService.get_order(order_id)}
+

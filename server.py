@@ -14,6 +14,7 @@ from services.projects_service import ProjectsService
 from services.hr_service import HRService
 from services.activities_calendar_service import ActivitiesCalendarService
 from services.analytics_service import AnalyticsService
+from services.theme_service import ThemeService
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +28,7 @@ logger = logging.getLogger("CognitiveERP.MCPServer")
 mcp = FastMCP("Cognitive ERP Odoo 20")
 
 # ==========================================
-# 📊 EXECUTIVE KPIS & ANALYTICS
+# 📊 EXECUTIVE KPIS & GENERIC ORM CRU
 # ==========================================
 
 @mcp.tool()
@@ -64,6 +65,24 @@ def odoo_generic_query(
         offset=offset,
         order=order
     )
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def odoo_create_record(model: str, values: Dict[str, Any]) -> str:
+    """Create a record in any Odoo model (Generic Create)."""
+    result = AnalyticsService.create_record(model=model, values=values)
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def odoo_read_record(model: str, record_id: int, fields: Optional[List[str]] = None) -> str:
+    """Read a specific record by model and ID in Odoo (Generic Read)."""
+    result = AnalyticsService.read_record(model=model, record_id=record_id, fields=fields)
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def odoo_update_record(model: str, record_id: int, values: Dict[str, Any]) -> str:
+    """Update fields on a specific record in any Odoo model (Generic Update)."""
+    result = AnalyticsService.update_record(model=model, record_id=record_id, values=values)
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 # ==========================================
@@ -113,13 +132,9 @@ def crm_create_lead(
     expected_revenue: float = 0.0,
     probability: Optional[float] = None,
     description: Optional[str] = None,
-    priority: str = "1",
-    is_opportunity: bool = True
+    priority: str = "1"
 ) -> str:
-    """
-    Create a new CRM lead or opportunity.
-    Priority values: '0' (Normal), '1' (Low), '2' (High), '3' (Very High).
-    """
+    """Create a new CRM lead or opportunity."""
     res = CRMService.create_lead(
         name=name,
         partner_id=partner_id,
@@ -129,46 +144,46 @@ def crm_create_lead(
         expected_revenue=expected_revenue,
         probability=probability,
         description=description,
-        priority=priority,
-        is_opportunity=is_opportunity
+        priority=priority
     )
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def crm_update_lead(
     lead_id: int,
+    name: Optional[str] = None,
     stage_id: Optional[int] = None,
     expected_revenue: Optional[float] = None,
     probability: Optional[float] = None,
     description: Optional[str] = None,
-    priority: Optional[str] = None
+    partner_id: Optional[int] = None,
+    phone: Optional[str] = None,
+    email_from: Optional[str] = None
 ) -> str:
-    """Update fields of an existing CRM lead/opportunity."""
-    values: Dict[str, Any] = {}
-    if stage_id is not None:
-        values["stage_id"] = stage_id
-    if expected_revenue is not None:
-        values["expected_revenue"] = expected_revenue
-    if probability is not None:
-        values["probability"] = probability
-    if description is not None:
-        values["description"] = description
-    if priority is not None:
-        values["priority"] = priority
+    """Update fields on a CRM lead/opportunity (stage, revenue, probability, notes, contact)."""
+    values = {}
+    if name is not None: values["name"] = name
+    if stage_id is not None: values["stage_id"] = stage_id
+    if expected_revenue is not None: values["expected_revenue"] = expected_revenue
+    if probability is not None: values["probability"] = probability
+    if description is not None: values["description"] = description
+    if partner_id is not None: values["partner_id"] = partner_id
+    if phone is not None: values["phone"] = phone
+    if email_from is not None: values["email_from"] = email_from
 
     res = CRMService.update_lead(lead_id, values)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def crm_mark_won(lead_id: int) -> str:
-    """Mark a CRM opportunity as Won (100% probability, stage won)."""
+    """Mark a CRM opportunity as Won (100% probability)."""
     res = CRMService.mark_lead_won(lead_id)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def crm_mark_lost(lead_id: int, lost_reason_id: Optional[int] = None) -> str:
     """Mark a CRM opportunity as Lost."""
-    res = CRMService.mark_lead_lost(lead_id, lost_reason_id)
+    res = CRMService.mark_lead_lost(lead_id, lost_reason_id=lost_reason_id)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================
@@ -182,10 +197,7 @@ def sales_list_orders(
     state: Optional[str] = None,
     limit: int = 20
 ) -> str:
-    """
-    List sales orders and quotations.
-    state options: 'draft' (Quotation), 'sent' (Quotation Sent), 'sale' (Sales Order), 'cancel' (Cancelled).
-    """
+    """List sales orders and quotations. State: 'draft', 'sent', 'sale', 'cancel'."""
     orders = SalesService.list_orders(
         search_term=search_term,
         partner_id=partner_id,
@@ -196,7 +208,7 @@ def sales_list_orders(
 
 @mcp.tool()
 def sales_get_order(order_id: int) -> str:
-    """Get complete details of a sales order/quotation including line items, products, and prices."""
+    """Get full details of a sales order or quotation including line items and totals."""
     order = SalesService.get_order(order_id)
     return json.dumps(order, indent=2, ensure_ascii=False)
 
@@ -208,13 +220,8 @@ def sales_create_quotation(
     note: Optional[str] = None
 ) -> str:
     """
-    Create a new sales quotation in Odoo.
-    order_lines should be a list of objects with:
-      - 'product_id' (int, required)
-      - 'qty' (float, default 1.0)
-      - 'price_unit' (float, optional: if omitted, Odoo uses standard list price)
-      - 'description' (str, optional line description)
-    Example: [{"product_id": 1, "qty": 2, "price_unit": 1250.0}]
+    Create a new quotation in draft state.
+    order_lines format: [{'product_id': 1, 'qty': 2, 'price_unit': 1250.0, 'description': 'Optional note'}]
     """
     res = SalesService.create_quotation(
         partner_id=partner_id,
@@ -225,14 +232,66 @@ def sales_create_quotation(
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
+def sales_update_order(
+    order_id: int,
+    partner_id: Optional[int] = None,
+    payment_term_id: Optional[int] = None,
+    note: Optional[str] = None,
+    validity_date: Optional[str] = None
+) -> str:
+    """Update header fields of a sales order or quotation."""
+    values = {}
+    if partner_id is not None: values["partner_id"] = partner_id
+    if payment_term_id is not None: values["payment_term_id"] = payment_term_id
+    if note is not None: values["note"] = note
+    if validity_date is not None: values["validity_date"] = validity_date
+
+    res = SalesService.update_order(order_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def sales_add_order_line(
+    order_id: int,
+    product_id: int,
+    qty: float = 1.0,
+    price_unit: Optional[float] = None,
+    description: Optional[str] = None
+) -> str:
+    """Add a product line to an existing sales order."""
+    res = SalesService.add_order_line(
+        order_id=order_id,
+        product_id=product_id,
+        qty=qty,
+        price_unit=price_unit,
+        description=description
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def sales_update_order_line(
+    line_id: int,
+    product_uom_qty: Optional[float] = None,
+    price_unit: Optional[float] = None,
+    name: Optional[str] = None
+) -> str:
+    """Update quantity, price, or description of a line in a sales order."""
+    values = {}
+    if product_uom_qty is not None: values["product_uom_qty"] = product_uom_qty
+    if price_unit is not None: values["price_unit"] = price_unit
+    if name is not None: values["name"] = name
+
+    res = SalesService.update_order_line(line_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
 def sales_confirm_order(order_id: int) -> str:
-    """Confirm a draft quotation into an active Sales Order (creates delivery/invoice hooks)."""
+    """Confirm a quotation to create a confirmed Sales Order."""
     res = SalesService.confirm_order(order_id)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def sales_cancel_order(order_id: int) -> str:
-    """Cancel a quotation or sales order."""
+    """Cancel a sales order or quotation."""
     res = SalesService.cancel_order(order_id)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
@@ -249,12 +308,7 @@ def invoices_list(
     search_term: Optional[str] = None,
     limit: int = 20
 ) -> str:
-    """
-    List customer invoices or vendor bills.
-    move_type: 'out_invoice' (Customer Invoice), 'in_invoice' (Vendor Bill), 'out_refund' (Credit Note).
-    state: 'draft', 'posted', 'cancel'.
-    payment_state: 'not_paid', 'in_payment', 'paid', 'reversed'.
-    """
+    """List customer invoices or vendor bills. move_type: 'out_invoice', 'in_invoice'."""
     invoices = InvoicingService.list_invoices(
         move_type=move_type,
         state=state,
@@ -267,7 +321,7 @@ def invoices_list(
 
 @mcp.tool()
 def invoices_get(invoice_id: int) -> str:
-    """Get complete details of an invoice or bill including line items and balance."""
+    """Get full details of an invoice including lines and residual balance."""
     invoice = InvoicingService.get_invoice(invoice_id)
     return json.dumps(invoice, indent=2, ensure_ascii=False)
 
@@ -280,10 +334,7 @@ def invoices_create(
     invoice_date_due: Optional[str] = None,
     ref: Optional[str] = None
 ) -> str:
-    """
-    Create a new draft invoice or vendor bill.
-    invoice_lines format: [{"product_id": 1, "quantity": 1, "price_unit": 1250.0, "name": "Service description"}]
-    """
+    """Create a draft invoice or vendor bill."""
     res = InvoicingService.create_invoice(
         partner_id=partner_id,
         invoice_lines=invoice_lines,
@@ -295,8 +346,46 @@ def invoices_create(
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
+def invoices_update_invoice(
+    invoice_id: int,
+    partner_id: Optional[int] = None,
+    invoice_date: Optional[str] = None,
+    invoice_date_due: Optional[str] = None,
+    ref: Optional[str] = None,
+    narration: Optional[str] = None
+) -> str:
+    """Update fields on a draft invoice."""
+    values = {}
+    if partner_id is not None: values["partner_id"] = partner_id
+    if invoice_date is not None: values["invoice_date"] = invoice_date
+    if invoice_date_due is not None: values["invoice_date_due"] = invoice_date_due
+    if ref is not None: values["ref"] = ref
+    if narration is not None: values["narration"] = narration
+
+    res = InvoicingService.update_invoice(invoice_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def invoices_add_line(
+    invoice_id: int,
+    name: str,
+    price_unit: float,
+    quantity: float = 1.0,
+    product_id: Optional[int] = None
+) -> str:
+    """Add a new line item to a draft invoice."""
+    res = InvoicingService.add_invoice_line(
+        invoice_id=invoice_id,
+        name=name,
+        price_unit=price_unit,
+        quantity=quantity,
+        product_id=product_id
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
 def invoices_post(invoice_id: int) -> str:
-    """Validate and Post a draft invoice (generates invoice number and journal entries)."""
+    """Validate and Post a draft invoice (assigns official invoice number)."""
     res = InvoicingService.post_invoice(invoice_id)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
@@ -306,7 +395,7 @@ def invoices_register_payment(
     amount: Optional[float] = None,
     payment_date: Optional[str] = None
 ) -> str:
-    """Register payment for an open invoice."""
+    """Register payment or collection for a posted invoice."""
     res = InvoicingService.register_payment(
         invoice_id=invoice_id,
         amount=amount,
@@ -315,7 +404,7 @@ def invoices_register_payment(
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================
-# 📦 INVENTORY & PRODUCTS
+# 📦 INVENTORY & CATALOG
 # ==========================================
 
 @mcp.tool()
@@ -324,10 +413,7 @@ def inventory_search_products(
     product_type: Optional[str] = None,
     limit: int = 25
 ) -> str:
-    """
-    Search products and services in the catalog by name, code/SKU, or barcode.
-    product_type: 'service', 'consu' (Consumable), 'product' (Storable).
-    """
+    """Search products and services in the catalog by name, SKU, or barcode."""
     products = InventoryService.search_products(
         query=query,
         product_type=product_type,
@@ -337,7 +423,7 @@ def inventory_search_products(
 
 @mcp.tool()
 def inventory_get_product(product_id: int) -> str:
-    """Get full product specifications, sales price, cost, and on-hand inventory."""
+    """Get full details of a specific product: sale price, cost, on-hand qty."""
     product = InventoryService.get_product(product_id)
     return json.dumps(product, indent=2, ensure_ascii=False)
 
@@ -350,10 +436,7 @@ def inventory_create_product(
     product_type: str = "service",
     description: Optional[str] = None
 ) -> str:
-    """
-    Create a new product or service in Odoo.
-    product_type: 'service', 'consu' (Consumable), 'product' (Storable).
-    """
+    """Create a new product or service in the catalog."""
     res = InventoryService.create_product(
         name=name,
         list_price=list_price,
@@ -367,20 +450,37 @@ def inventory_create_product(
 @mcp.tool()
 def inventory_update_product(
     product_id: int,
+    name: Optional[str] = None,
     list_price: Optional[float] = None,
     standard_price: Optional[float] = None,
-    description: Optional[str] = None
+    default_code: Optional[str] = None,
+    barcode: Optional[str] = None,
+    description_sale: Optional[str] = None
 ) -> str:
-    """Update sales price, cost price, or description of a product."""
-    values: Dict[str, Any] = {}
-    if list_price is not None:
-        values["list_price"] = list_price
-    if standard_price is not None:
-        values["standard_price"] = standard_price
-    if description is not None:
-        values["description_sale"] = description
+    """Update fields on an existing product (price, cost, SKU, description)."""
+    values = {}
+    if name is not None: values["name"] = name
+    if list_price is not None: values["list_price"] = list_price
+    if standard_price is not None: values["standard_price"] = standard_price
+    if default_code is not None: values["default_code"] = default_code
+    if barcode is not None: values["barcode"] = barcode
+    if description_sale is not None: values["description_sale"] = description_sale
 
     res = InventoryService.update_product(product_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def inventory_update_stock_quantity(
+    product_id: int,
+    new_quantity: float,
+    location_id: Optional[int] = None
+) -> str:
+    """Update on-hand stock quantity of a product via stock.quant."""
+    res = InventoryService.update_stock_quantity(
+        product_id=product_id,
+        new_quantity=new_quantity,
+        location_id=location_id
+    )
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
@@ -390,11 +490,7 @@ def inventory_list_pickings(
     partner_id: Optional[int] = None,
     limit: int = 20
 ) -> str:
-    """
-    List stock picking transfers (Deliveries, Receipts, Internal Transfers).
-    picking_type: 'outgoing' (Delivery), 'incoming' (Receipt), 'internal'.
-    state: 'draft', 'waiting', 'confirmed', 'assigned' (Ready), 'done', 'cancel'.
-    """
+    """List stock transfers (Delivery orders, receipts, internal transfers)."""
     pickings = InventoryService.list_pickings(
         picking_type=picking_type,
         state=state,
@@ -402,6 +498,28 @@ def inventory_list_pickings(
         limit=limit
     )
     return json.dumps(pickings, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def inventory_get_picking(picking_id: int) -> str:
+    """Get full details of a stock picking/transfer with move lines."""
+    picking = InventoryService.get_picking(picking_id)
+    return json.dumps(picking, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def inventory_update_picking(
+    picking_id: int,
+    scheduled_date: Optional[str] = None,
+    origin: Optional[str] = None,
+    partner_id: Optional[int] = None
+) -> str:
+    """Update fields on a stock picking."""
+    values = {}
+    if scheduled_date is not None: values["scheduled_date"] = scheduled_date
+    if origin is not None: values["origin"] = origin
+    if partner_id is not None: values["partner_id"] = partner_id
+
+    res = InventoryService.update_picking(picking_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================
 # 👥 CONTACTS & PARTNERS
@@ -415,7 +533,7 @@ def contacts_search(
     is_supplier: Optional[bool] = None,
     limit: int = 25
 ) -> str:
-    """Search customers, suppliers, and contacts by name, email, phone, or Tax ID (RUC / DNI)."""
+    """Search customers, suppliers, and contacts by name, email, phone, or VAT/RUC/DNI."""
     contacts = ContactsService.search_contacts(
         query=query,
         is_company=is_company,
@@ -427,7 +545,7 @@ def contacts_search(
 
 @mcp.tool()
 def contacts_get(partner_id: int) -> str:
-    """Get complete contact card with address, commercial company, and transaction history."""
+    """Get complete contact card with commercial balance and details."""
     contact = ContactsService.get_contact(partner_id)
     return json.dumps(contact, indent=2, ensure_ascii=False)
 
@@ -444,7 +562,7 @@ def contacts_create(
     is_supplier: bool = False,
     comment: Optional[str] = None
 ) -> str:
-    """Create a new contact, customer, or vendor with RUC/DNI and contact information."""
+    """Create a new contact, customer, or supplier."""
     res = ContactsService.create_contact(
         name=name,
         email=email,
@@ -467,22 +585,18 @@ def contacts_update(
     phone: Optional[str] = None,
     vat: Optional[str] = None,
     street: Optional[str] = None,
-    city: Optional[str] = None
+    city: Optional[str] = None,
+    comment: Optional[str] = None
 ) -> str:
-    """Update contact information."""
-    values: Dict[str, Any] = {}
-    if name is not None:
-        values["name"] = name
-    if email is not None:
-        values["email"] = email
-    if phone is not None:
-        values["phone"] = phone
-    if vat is not None:
-        values["vat"] = vat
-    if street is not None:
-        values["street"] = street
-    if city is not None:
-        values["city"] = city
+    """Update fields on a contact/partner."""
+    values = {}
+    if name is not None: values["name"] = name
+    if email is not None: values["email"] = email
+    if phone is not None: values["phone"] = phone
+    if vat is not None: values["vat"] = vat
+    if street is not None: values["street"] = street
+    if city is not None: values["city"] = city
+    if comment is not None: values["comment"] = comment
 
     res = ContactsService.update_contact(partner_id, values)
     return json.dumps(res, indent=2, ensure_ascii=False)
@@ -493,9 +607,57 @@ def contacts_update(
 
 @mcp.tool()
 def projects_list(search_term: Optional[str] = None, limit: int = 20) -> str:
-    """List active projects and total task counts."""
+    """List active projects with task counts."""
     projects = ProjectsService.list_projects(search_term=search_term, limit=limit)
     return json.dumps(projects, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def projects_get_project(project_id: int) -> str:
+    """Get full details of a specific project."""
+    project = ProjectsService.get_project(project_id)
+    return json.dumps(project, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def projects_create_project(
+    name: str,
+    partner_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    description: Optional[str] = None,
+    date_start: Optional[str] = None,
+    date: Optional[str] = None
+) -> str:
+    """Create a new project in Odoo."""
+    res = ProjectsService.create_project(
+        name=name,
+        partner_id=partner_id,
+        user_id=user_id,
+        description=description,
+        date_start=date_start,
+        date=date
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def projects_update_project(
+    project_id: int,
+    name: Optional[str] = None,
+    partner_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    description: Optional[str] = None,
+    date_start: Optional[str] = None,
+    date: Optional[str] = None
+) -> str:
+    """Update fields on an existing project."""
+    values = {}
+    if name is not None: values["name"] = name
+    if partner_id is not None: values["partner_id"] = partner_id
+    if user_id is not None: values["user_id"] = user_id
+    if description is not None: values["description"] = description
+    if date_start is not None: values["date_start"] = date_start
+    if date is not None: values["date"] = date
+
+    res = ProjectsService.update_project(project_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def projects_list_tasks(
@@ -505,7 +667,7 @@ def projects_list_tasks(
     is_closed: Optional[bool] = None,
     limit: int = 25
 ) -> str:
-    """List project tasks or to-dos filtered by project, assignee, or status."""
+    """List tasks with optional filters."""
     tasks = ProjectsService.list_tasks(
         project_id=project_id,
         search_term=search_term,
@@ -517,7 +679,7 @@ def projects_list_tasks(
 
 @mcp.tool()
 def projects_get_task(task_id: int) -> str:
-    """Get full details and description of a task."""
+    """Get full task details including description."""
     task = ProjectsService.get_task(task_id)
     return json.dumps(task, indent=2, ensure_ascii=False)
 
@@ -530,11 +692,7 @@ def projects_create_task(
     date_deadline: Optional[str] = None,
     priority: str = "0"
 ) -> str:
-    """
-    Create a new task or to-do.
-    priority: '0' (Normal), '1' (Important).
-    date_deadline: 'YYYY-MM-DD'.
-    """
+    """Create a new project task or todo."""
     res = ProjectsService.create_task(
         name=name,
         project_id=project_id,
@@ -554,24 +712,19 @@ def projects_update_task(
     date_deadline: Optional[str] = None,
     priority: Optional[str] = None
 ) -> str:
-    """Update task details or move to another stage."""
-    values: Dict[str, Any] = {}
-    if name is not None:
-        values["name"] = name
-    if stage_id is not None:
-        values["stage_id"] = stage_id
-    if description is not None:
-        values["description"] = description
-    if date_deadline is not None:
-        values["date_deadline"] = date_deadline
-    if priority is not None:
-        values["priority"] = priority
+    """Update properties of a task."""
+    values = {}
+    if name is not None: values["name"] = name
+    if stage_id is not None: values["stage_id"] = stage_id
+    if description is not None: values["description"] = description
+    if date_deadline is not None: values["date_deadline"] = date_deadline
+    if priority is not None: values["priority"] = priority
 
     res = ProjectsService.update_task(task_id, values)
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================
-# 👔 HUMAN RESOURCES (HR)
+# 👥 HR & EMPLOYEES
 # ==========================================
 
 @mcp.tool()
@@ -580,7 +733,7 @@ def hr_list_employees(
     department_id: Optional[int] = None,
     limit: int = 25
 ) -> str:
-    """List company employees with department, job title, email, and phone."""
+    """List employees with department, job title, email, and phone."""
     employees = HRService.list_employees(
         search_term=search_term,
         department_id=department_id,
@@ -590,15 +743,93 @@ def hr_list_employees(
 
 @mcp.tool()
 def hr_get_employee(employee_id: int) -> str:
-    """Get detailed profile of an employee."""
+    """Get full details of an employee."""
     employee = HRService.get_employee(employee_id)
     return json.dumps(employee, indent=2, ensure_ascii=False)
 
 @mcp.tool()
+def hr_create_employee(
+    name: str,
+    job_title: Optional[str] = None,
+    work_email: Optional[str] = None,
+    work_phone: Optional[str] = None,
+    mobile_phone: Optional[str] = None,
+    department_id: Optional[int] = None,
+    parent_id: Optional[int] = None
+) -> str:
+    """Create a new employee record."""
+    res = HRService.create_employee(
+        name=name,
+        job_title=job_title,
+        work_email=work_email,
+        work_phone=work_phone,
+        mobile_phone=mobile_phone,
+        department_id=department_id,
+        parent_id=parent_id
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def hr_update_employee(
+    employee_id: int,
+    name: Optional[str] = None,
+    job_title: Optional[str] = None,
+    work_email: Optional[str] = None,
+    work_phone: Optional[str] = None,
+    mobile_phone: Optional[str] = None,
+    department_id: Optional[int] = None,
+    parent_id: Optional[int] = None
+) -> str:
+    """Update fields on an employee."""
+    values = {}
+    if name is not None: values["name"] = name
+    if job_title is not None: values["job_title"] = job_title
+    if work_email is not None: values["work_email"] = work_email
+    if work_phone is not None: values["work_phone"] = work_phone
+    if mobile_phone is not None: values["mobile_phone"] = mobile_phone
+    if department_id is not None: values["department_id"] = department_id
+    if parent_id is not None: values["parent_id"] = parent_id
+
+    res = HRService.update_employee(employee_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
 def hr_list_departments() -> str:
-    """List departments in the organization."""
+    """List company departments with employee counts."""
     departments = HRService.list_departments()
     return json.dumps(departments, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def hr_get_department(department_id: int) -> str:
+    """Get full details of a specific department."""
+    department = HRService.get_department(department_id)
+    return json.dumps(department, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def hr_create_department(
+    name: str,
+    manager_id: Optional[int] = None,
+    parent_id: Optional[int] = None
+) -> str:
+    """Create a new department."""
+    res = HRService.create_department(name=name, manager_id=manager_id, parent_id=parent_id)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def hr_update_department(
+    department_id: int,
+    name: Optional[str] = None,
+    manager_id: Optional[int] = None,
+    parent_id: Optional[int] = None
+) -> str:
+    """Update fields on a department."""
+    values = {}
+    if name is not None: values["name"] = name
+    if manager_id is not None: values["manager_id"] = manager_id
+    if parent_id is not None: values["parent_id"] = parent_id
+
+    res = HRService.update_department(department_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================
 # ⏰ ACTIVITIES & CALENDAR
@@ -647,6 +878,24 @@ def activities_create(
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 @mcp.tool()
+def activities_update(
+    activity_id: int,
+    summary: Optional[str] = None,
+    date_deadline: Optional[str] = None,
+    note: Optional[str] = None,
+    user_id: Optional[int] = None
+) -> str:
+    """Update fields on a scheduled activity."""
+    values = {}
+    if summary is not None: values["summary"] = summary
+    if date_deadline is not None: values["date_deadline"] = date_deadline
+    if note is not None: values["note"] = note
+    if user_id is not None: values["user_id"] = user_id
+
+    res = ActivitiesCalendarService.update_activity(activity_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
 def activities_mark_done(activity_id: int, feedback: Optional[str] = None) -> str:
     """Mark a scheduled activity as completed with optional feedback."""
     res = ActivitiesCalendarService.mark_activity_done(activity_id, feedback=feedback)
@@ -665,6 +914,12 @@ def calendar_list_meetings(
         limit=limit
     )
     return json.dumps(events, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def calendar_get_meeting(event_id: int) -> str:
+    """Get full details of a specific calendar meeting."""
+    event = ActivitiesCalendarService.get_calendar_event(event_id)
+    return json.dumps(event, indent=2, ensure_ascii=False)
 
 @mcp.tool()
 def calendar_create_meeting(
@@ -689,6 +944,84 @@ def calendar_create_meeting(
         location=location,
         allday=allday
     )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def calendar_update_meeting(
+    event_id: int,
+    name: Optional[str] = None,
+    start: Optional[str] = None,
+    stop: Optional[str] = None,
+    partner_ids: Optional[List[int]] = None,
+    description: Optional[str] = None,
+    location: Optional[str] = None
+) -> str:
+    """Update fields on a calendar meeting/event."""
+    values = {}
+    if name is not None: values["name"] = name
+    if start is not None: values["start"] = start
+    if stop is not None: values["stop"] = stop
+    if partner_ids is not None: values["partner_ids"] = partner_ids
+    if description is not None: values["description"] = description
+    if location is not None: values["location"] = location
+
+    res = ActivitiesCalendarService.update_calendar_event(event_id, values)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+# ==========================================
+# 🎨 THEME & BRANDING
+# ==========================================
+
+@mcp.tool()
+def theme_get_branding(company_id: int = 1) -> str:
+    """Get current corporate branding colors (primary, secondary), font, and company info."""
+    res = ThemeService.get_branding(company_id=company_id)
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def theme_update_branding(
+    company_id: int = 1,
+    primary_color: Optional[str] = None,
+    secondary_color: Optional[str] = None,
+    font: Optional[str] = None,
+    name: Optional[str] = None
+) -> str:
+    """Update company branding colors, typography, or company name."""
+    res = ThemeService.update_branding(
+        company_id=company_id,
+        primary_color=primary_color,
+        secondary_color=secondary_color,
+        font=font,
+        name=name
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def theme_set_navbar_theme(
+    navbar_bg_start: str = "#092D53",
+    navbar_bg_end: str = "#1E3A8A",
+    navbar_text_color: str = "#FFFFFF",
+    primary_accent: str = "#0EA5E9"
+) -> str:
+    """Apply custom aesthetic theme to Odoo 20 backend navbar with gradients and accents."""
+    res = ThemeService.set_navbar_theme(
+        navbar_bg_start=navbar_bg_start,
+        navbar_bg_end=navbar_bg_end,
+        navbar_text_color=navbar_text_color,
+        primary_accent=primary_accent
+    )
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def theme_remove_custom_css() -> str:
+    """Restore default Odoo 20 theme and remove custom CSS."""
+    res = ThemeService.remove_custom_css()
+    return json.dumps(res, indent=2, ensure_ascii=False)
+
+@mcp.tool()
+def theme_list_fonts() -> str:
+    """List available recommended fonts for Odoo theme."""
+    res = ThemeService.list_available_fonts()
     return json.dumps(res, indent=2, ensure_ascii=False)
 
 # ==========================================

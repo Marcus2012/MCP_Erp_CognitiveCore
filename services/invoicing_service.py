@@ -118,11 +118,41 @@ class InvoicingService:
         return {"id": new_invoice_id, "status": "created", "invoice": InvoicingService.get_invoice(new_invoice_id)}
 
     @staticmethod
+    def update_invoice(invoice_id: int, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Update fields on an invoice (e.g. invoice_date, invoice_date_due, ref, narration, partner_id)."""
+        client = get_odoo_client()
+        client.write("account.move", invoice_id, values)
+        return {"id": invoice_id, "status": "updated", "invoice": InvoicingService.get_invoice(invoice_id)}
+
+    @staticmethod
+    def add_invoice_line(
+        invoice_id: int,
+        name: str,
+        price_unit: float,
+        quantity: float = 1.0,
+        product_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Add a new line item to a draft invoice."""
+        client = get_odoo_client()
+        line_vals: Dict[str, Any] = {
+            "move_id": invoice_id,
+            "name": name,
+            "quantity": quantity,
+            "price_unit": price_unit,
+        }
+        if product_id:
+            line_vals["product_id"] = product_id
+
+        line_id = client.create("account.move.line", line_vals)
+        return {"line_id": line_id, "invoice_id": invoice_id, "status": "line_added", "invoice": InvoicingService.get_invoice(invoice_id)}
+
+    @staticmethod
     def post_invoice(invoice_id: int) -> Dict[str, Any]:
         """Validate and Post a draft invoice (makes it officially numbered and posted)."""
         client = get_odoo_client()
         client.execute_kw("account.move", "action_post", [[invoice_id]])
         return {"id": invoice_id, "status": "posted", "invoice": InvoicingService.get_invoice(invoice_id)}
+
 
     @staticmethod
     def register_payment(
